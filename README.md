@@ -19,16 +19,34 @@ Issue ─▶ Planner ─▶ Executor ─▶ Validator ─┬─ pass ─▶ Patc
 | Phase | Scope | State |
 |-------|-------|-------|
 | 1 | Repo layout, CI, branch protection | ✅ Done |
-| 2 | Ephemeral Docker sandbox | ⬜ Not started |
+| 2 | Ephemeral Docker sandbox | ✅ Done |
 | 3 | MCP server & tool suite | ⬜ Not started |
 | 4 | LangGraph nodes & state machine | ⬜ Not started |
 | 5 | Stack-trace trimming & self-correction routing | ⬜ Not started |
 | 6 | Output artifacts & terminal UI | ⬜ Not started |
 | 7 | Evaluation suite & metrics | ⬜ Not started |
 
-Phase 1 ships the package skeleton, the `AgentState` schema, the router decision
-function, and a green CI pipeline. Every other module is a documented placeholder that
-raises `NotImplementedError` naming its phase.
+Phases 1–2 ship the package skeleton, the `AgentState` schema, the router decision
+function, the Docker sandbox runner, and a green CI pipeline. Every other module is a
+documented placeholder that raises `NotImplementedError` naming its phase.
+
+### Sandbox isolation
+
+`SandboxRunner` treats every command as hostile — it is running code an LLM wrote in
+response to a bug report. Each run gets a fresh container with:
+
+| Control | Default | Why |
+|---------|---------|-----|
+| Network | disabled | Untrusted code cannot phone home or exfiltrate |
+| Capabilities | `cap_drop: ALL` | No raw sockets, no mount, no ptrace |
+| Privilege escalation | `no-new-privileges:true` | setuid binaries cannot elevate |
+| Memory | 512 MB | A runaway allocation cannot exhaust the host |
+| PIDs | 256 | Blocks fork bombs |
+| Wall clock | 30 s | Infinite loops are killed and reported as exit 124 |
+| Lifetime | `remove(force=True)` in `finally` | No container leaks across retry cycles |
+
+The container runs as the host UID rather than the image's baked-in user, so pytest can
+write `__pycache__` into the mounted workspace without running as root.
 
 ## Layout
 
