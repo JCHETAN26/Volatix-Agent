@@ -80,4 +80,7 @@ black . && flake8 .
 ```
 
 **All changes ship through pull requests.** Direct pushes to `main` are blocked by branch
-protection; PRs need a passing CI run and one approval before merging.
+protection — including for admins. A PR merges once all three CI jobs pass and the branch
+is up to date with `main`. Reviewer approval is not required while the project is
+single-maintainer; raise `required_approving_review_count` once there is a second
+collaborator.
