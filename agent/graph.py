@@ -19,6 +19,7 @@ from langgraph.graph import END, StateGraph
 from agent.llm import ClaudeClient
 from agent.nodes.executor import executor_node
 from agent.nodes.planner import planner_node
+from agent.nodes.stack_parser import trim_stack_trace
 from agent.nodes.validator import validator_node
 from agent.router import ROUTE_FAIL, ROUTE_FINALIZE, ROUTE_RETRY, route_after_validation
 from agent.state import AgentState
@@ -26,18 +27,13 @@ from agent.tools import ToolBackend
 from mcp_server.workspace import Workspace
 from sandbox.runner import SandboxRunner
 
-# Cap on how much raw pytest output is fed back to the Executor. Phase 5 replaces this
-# with a real stack-trace parser; the truncation is a stopgap so the loop is closed and
-# testable now rather than a considered summarisation strategy.
-MAX_RAW_FEEDBACK_CHARS = 4_000
-
 
 def _retry_node(state: AgentState) -> dict:
-    """Consume one retry and hand the failure evidence to the Executor."""
-    output = state["test_output"]
-    if len(output) > MAX_RAW_FEEDBACK_CHARS:
-        output = output[-MAX_RAW_FEEDBACK_CHARS:]
-    return {"retry_count": state["retry_count"] + 1, "error_summary": output}
+    """Consume one retry and hand the trimmed failure evidence to the Executor."""
+    return {
+        "retry_count": state["retry_count"] + 1,
+        "error_summary": trim_stack_trace(state["test_output"]),
+    }
 
 
 def _finalize_node(state: AgentState) -> dict:
@@ -50,7 +46,7 @@ def _give_up_node(state: AgentState) -> dict:
     return {
         "error_summary": (
             f"Gave up after {state['retry_count']} retries. "
-            f"Last test output:\n{state['test_output']}"
+            f"Last failure:\n{trim_stack_trace(state['test_output'])}"
         )
     }
 

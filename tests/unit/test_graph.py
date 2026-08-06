@@ -8,7 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from agent.graph import MAX_RAW_FEEDBACK_CHARS, build_graph
+from agent.graph import build_graph
+from agent.nodes.stack_parser import MAX_CHARS
 from agent.state import build_initial_state
 from agent.tools import ToolBackend
 from sandbox.runner import ExecutionResult
@@ -125,15 +126,52 @@ def test_validator_runs_once_per_executor_pass(workspace):
     assert runner.run_tests.call_count == 2
 
 
-def test_long_pytest_output_is_truncated_before_being_fed_back(workspace):
-    """Raw pytest output can be enormous; Phase 5 replaces this with real trimming."""
-    noisy = ExecutionResult(1, "x" * (MAX_RAW_FEEDBACK_CHARS * 3), "", 12.0, False)
+def test_long_pytest_output_is_trimmed_before_being_fed_back(workspace):
+    noisy = ExecutionResult(1, "x" * (MAX_CHARS * 3), "", 12.0, False)
     client = FakeClaudeClient([plan_message(), *edit_then_finish(), *edit_then_finish()])
 
     run(workspace, client, runner_returning(noisy, PASS))
 
     retry_prompt = client.requests[3]["messages"][0]["content"]
-    assert len(retry_prompt) < MAX_RAW_FEEDBACK_CHARS * 2
+    assert len(retry_prompt) < MAX_CHARS * 2
+
+
+def test_retry_feeds_back_the_trimmed_failure_not_the_raw_log(workspace):
+    """The Executor should see the assertion, not pytest's framework frames."""
+    raw = (
+        "=================================== FAILURES ===================================\n"
+        "___________________________________ test_add ___________________________________\n"
+        "/venv/lib/site-packages/_pytest/python.py:508: in importtestmodule\n"
+        "    mod = import_path(\n"
+        "E       assert -1 == 5\n"
+        "\n"
+        "tests/test_calc.py:5: AssertionError\n"
+        "1 failed in 0.02s\n"
+    )
+    client = FakeClaudeClient([plan_message(), *edit_then_finish(), *edit_then_finish()])
+
+    run(workspace, client, runner_returning(ExecutionResult(1, raw, "", 12.0, False), PASS))
+
+    retry_prompt = client.requests[3]["messages"][0]["content"]
+    assert "assert -1 == 5" in retry_prompt
+    assert "tests/test_calc.py:5" in retry_prompt
+    assert "_pytest" not in retry_prompt
+    assert "site-packages" not in retry_prompt
+
+
+def test_give_up_summary_is_also_trimmed(workspace):
+    raw = (
+        "=== FAILURES ===\n___ test_x ___\n"
+        "E       assert 1 == 2\n\nt.py:3: AssertionError\n1 failed\n"
+    )
+    client = FakeClaudeClient([plan_message(), *edit_then_finish()])
+
+    final = run(
+        workspace, client, runner_returning(ExecutionResult(1, raw, "", 1.0, False)), max_retries=0
+    )
+
+    assert "assert 1 == 2" in final["error_summary"]
+    assert "Gave up after 0 retries" in final["error_summary"]
 
 
 def test_token_usage_accumulates_across_the_whole_run(workspace):
