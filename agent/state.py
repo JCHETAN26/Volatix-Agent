@@ -12,6 +12,11 @@ DEFAULT_MAX_RETRIES = 3
 class AgentState(TypedDict):
     """State carried across all agent nodes.
 
+    The last three fields extend the original schema: ``analysis`` and ``target_files``
+    feed the Phase 6 root-cause report, and ``token_usage`` feeds the Phase 7
+    token-efficiency metric. Threading them through the graph now avoids re-running
+    every benchmark scenario later just to collect them.
+
     Attributes:
         issue_description: The raw bug report, ticket, or failing error log.
         codebase_path: Absolute path to the repository under repair.
@@ -22,6 +27,9 @@ class AgentState(TypedDict):
         retry_count: Number of self-correction cycles consumed so far.
         max_retries: Ceiling on self-correction cycles before giving up.
         error_summary: Trimmed stack trace injected back into the Executor on failure.
+        analysis: The Planner's account of the root cause.
+        target_files: Paths the Planner expects to need editing.
+        token_usage: Cumulative token counters across every model call in the run.
     """
 
     issue_description: str
@@ -33,6 +41,9 @@ class AgentState(TypedDict):
     retry_count: int
     max_retries: int
     error_summary: Optional[str]
+    analysis: str
+    target_files: List[str]
+    token_usage: Dict[str, int]
 
 
 def build_initial_state(
@@ -51,4 +62,7 @@ def build_initial_state(
         retry_count=0,
         max_retries=max_retries,
         error_summary=None,
+        analysis="",
+        target_files=[],
+        token_usage={},
     )

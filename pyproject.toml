@@ -12,8 +12,8 @@ license = { text = "MIT" }
 authors = [{ name = "Chetan J" }]
 
 dependencies = [
-    "langgraph>=0.2.0",
-    "langchain-core>=0.3.0",
+    "anthropic>=0.120.0",
+    "langgraph>=1.0.0",
     # 2.x only: the tool API moved from FastMCP to MCPServer, so 1.x will not import.
     "mcp>=2.0.0",
     "docker>=7.1.0",
