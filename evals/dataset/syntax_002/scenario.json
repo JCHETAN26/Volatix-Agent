@@ -1,0 +1,7 @@
+{
+  "id": "syntax_002",
+  "category": "syntax",
+  "issue": "totals.py fails to parse -- pytest reports a SyntaxError before any test runs.",
+  "test_path": "tests/",
+  "buggy_file": "totals.py"
+}

@@ -1,0 +1,85 @@
+name: Benchmark
+
+# Manually triggered, never on push: every run costs real tokens and takes minutes.
+# This is also the only place the full loop executes end to end against real Docker.
+on:
+  workflow_dispatch:
+    inputs:
+      condition:
+        description: "Which condition to run"
+        type: choice
+        options: [both, agent, baseline]
+        default: both
+      category:
+        description: "Limit to one bug category (blank = all)"
+        type: choice
+        options: ["", syntax, logic, type, edge]
+        default: ""
+      max_retries:
+        description: "Self-correction budget per scenario"
+        default: "3"
+
+jobs:
+  benchmark:
+    name: Run benchmark suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -e ".[dev]"
+
+      - name: Build sandbox image
+        run: docker build -t volatix-sandbox:latest -f sandbox/Dockerfile.sandbox .
+
+      - name: Run benchmark
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY repository secret is not set."
+            exit 1
+          fi
+          ARGS="--condition ${{ inputs.condition }} --max-retries ${{ inputs.max_retries }}"
+          if [ -n "${{ inputs.category }}" ]; then
+            ARGS="$ARGS --category ${{ inputs.category }}"
+          fi
+          python -m evals.run_evals --output-file evals/results.json $ARGS
+
+      - name: Summarise
+        if: always()
+        run: |
+          if [ -f evals/results.json ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          report = json.load(open("evals/results.json"))
+          print("## Benchmark results\n")
+          print("| Metric | Baseline (A) | Agent (B) |")
+          print("|---|---:|---:|")
+          a = report["conditions"]["baseline"]
+          b = report["conditions"]["agent"]
+          rows = [
+              ("Scenarios", "scenarios"), ("Passed", "passed"), ("Pass@1 %", "pass_rate"),
+              ("Avg retries (on success)", "avg_retries_on_success"),
+              ("Avg total tokens", "avg_total_tokens"),
+              ("Avg billable input tokens", "avg_billable_input_tokens"),
+              ("Avg model calls", "avg_model_calls"),
+              ("Avg sandbox ms/run", "avg_sandbox_ms_per_run"),
+              ("Errors", "errors"),
+          ]
+          for label, key in rows:
+              print(f"| {label} | {a.get(key, 0)} | {b.get(key, 0)} |")
+          PY
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: evals/results.json
+          if-no-files-found: warn

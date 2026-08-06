@@ -1,0 +1,7 @@
+{
+  "id": "logic_003",
+  "category": "logic",
+  "issue": "apply_discount(100, 20) returns 120 -- it is adding the discount instead of subtracting it.",
+  "test_path": "tests/",
+  "buggy_file": "pricing.py"
+}

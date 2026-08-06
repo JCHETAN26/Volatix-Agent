@@ -1,0 +1,7 @@
+{
+  "id": "logic_001",
+  "category": "logic",
+  "issue": "last_n(items, n) drops one element: last_n([1,2,3,4,5], 3) returns [4, 5] instead of [3, 4, 5].",
+  "test_path": "tests/",
+  "buggy_file": "window.py"
+}

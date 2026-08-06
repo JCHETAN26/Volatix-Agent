@@ -1,0 +1,7 @@
+{
+  "id": "logic_002",
+  "category": "logic",
+  "issue": "is_adult(18) returns False. The legal age is 18, so 18 should qualify.",
+  "test_path": "tests/",
+  "buggy_file": "eligibility.py"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "type_002",
+  "category": "type",
+  "issue": "display_name crashes with AttributeError: 'NoneType' object has no attribute 'strip' when a user has no nickname.",
+  "test_path": "tests/",
+  "buggy_file": "accounts.py"
+}

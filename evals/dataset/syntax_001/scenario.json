@@ -1,0 +1,7 @@
+{
+  "id": "syntax_001",
+  "category": "syntax",
+  "issue": "The package will not import: collecting tests fails with a SyntaxError in greeter.py.",
+  "test_path": "tests/",
+  "buggy_file": "greeter.py"
+}

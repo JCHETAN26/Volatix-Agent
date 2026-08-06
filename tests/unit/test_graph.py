@@ -13,7 +13,14 @@ from agent.nodes.stack_parser import MAX_CHARS
 from agent.state import build_initial_state
 from agent.tools import ToolBackend
 from sandbox.runner import ExecutionResult
-from tests.unit.conftest import FakeClaudeClient, message, plan_message, text_block, tool_block
+from tests.unit.conftest import (
+    FakeClaudeClient,
+    message,
+    plan_message,
+    prompt_text,
+    text_block,
+    tool_block,
+)
 
 CONFIG = {"configurable": {"thread_id": "test"}}
 
@@ -78,7 +85,7 @@ def test_the_failure_is_injected_into_the_second_executor_pass(workspace):
 
     run(workspace, client, runner_returning(FAIL, PASS))
 
-    retry_prompt = client.requests[3]["messages"][0]["content"]
+    retry_prompt = prompt_text(client.requests[3])
     assert "did not pass the test suite" in retry_prompt
     assert "assert -1 == 5" in retry_prompt
 
@@ -132,7 +139,7 @@ def test_long_pytest_output_is_trimmed_before_being_fed_back(workspace):
 
     run(workspace, client, runner_returning(noisy, PASS))
 
-    retry_prompt = client.requests[3]["messages"][0]["content"]
+    retry_prompt = prompt_text(client.requests[3])
     assert len(retry_prompt) < MAX_CHARS * 2
 
 
@@ -152,7 +159,7 @@ def test_retry_feeds_back_the_trimmed_failure_not_the_raw_log(workspace):
 
     run(workspace, client, runner_returning(ExecutionResult(1, raw, "", 12.0, False), PASS))
 
-    retry_prompt = client.requests[3]["messages"][0]["content"]
+    retry_prompt = prompt_text(client.requests[3])
     assert "assert -1 == 5" in retry_prompt
     assert "tests/test_calc.py:5" in retry_prompt
     assert "_pytest" not in retry_prompt

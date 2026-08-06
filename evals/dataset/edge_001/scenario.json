@@ -1,0 +1,7 @@
+{
+  "id": "edge_001",
+  "category": "edge",
+  "issue": "average([]) raises ZeroDivisionError. An empty series should report 0.0.",
+  "test_path": "tests/",
+  "buggy_file": "stats.py"
+}
