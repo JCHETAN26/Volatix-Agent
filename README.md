@@ -23,7 +23,7 @@ Issue ─▶ Planner ─▶ Executor ─▶ Validator ─┬─ pass ─▶ Patc
 | 3 | MCP server & tool suite | ✅ Done |
 | 4 | LangGraph nodes & state machine | ✅ Done |
 | 5 | Stack-trace trimming & self-correction routing | ✅ Done |
-| 6 | Output artifacts & terminal UI | ⬜ Not started |
+| 6 | Output artifacts & terminal UI | ✅ Done |
 | 7 | Evaluation suite & metrics | ⬜ Not started |
 
 Phases 1–2 ship the package skeleton, the `AgentState` schema, the router decision
@@ -131,6 +131,37 @@ Note `test_boom` resolves to `calc.py:6` — the innermost frame in the source, 
 
 Unrecognised output (sandbox error, timeout kill, segfault) falls back to the raw tail
 rather than returning nothing, which would silently break the retry loop.
+
+### Artifacts
+
+Every run writes two files to `--output-dir`:
+
+- `fix.diff` — a unified diff, verified to apply with `git apply` (new files diff against
+  `/dev/null`)
+- `root_cause_analysis.md` — issue, root cause, plan, files changed, verification, and
+  token usage
+
+A file modified without a recorded pre-edit baseline is **excluded** from the diff and
+flagged in the report. Rendering it against `/dev/null` would produce a patch claiming an
+existing file is new — one that either fails to apply or silently clobbers the original.
+An incomplete patch that says so beats a wrong one that doesn't.
+
+```
+  Planning    Produced a 1-step plan
+  Executing   Modified 1 file(s): calc.py
+  Validating  Tests failed
+  Retrying    Retry 1 — re-running the executor
+  Executing   Modified 1 file(s): calc.py
+  Validating  Tests passed
+  Finalizing  Tests pass — preparing artifacts
+
+  Result           tests pass
+  Retries          1 of 3
+  Files changed    1
+  Tokens           6,763 over 4 calls
+```
+
+Exit codes: `0` tests pass, `1` tests fail or the run aborted, `2` bad configuration.
 
 ## Layout
 

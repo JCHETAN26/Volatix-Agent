@@ -10,7 +10,7 @@ stdio, which keeps the self-correction loop fast without duplicating the logic.
 the Executor cannot declare itself finished.
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from mcp_server.ast_tools import extract_outline
 from mcp_server.workspace import Workspace, WorkspaceError
@@ -101,6 +101,9 @@ class ToolBackend:
     def __init__(self, workspace: Workspace):
         self.workspace = workspace
         self.modified_files: Dict[str, str] = {}
+        # Pre-edit contents, captured on first write so Phase 6 can build a diff.
+        # None means the file did not exist and the edit created it.
+        self.original_files: Dict[str, Optional[str]] = {}
 
     def dispatch(self, name: str, arguments: Dict[str, Any]) -> Tuple[str, bool]:
         """Run one tool call.
@@ -132,7 +135,19 @@ class ToolBackend:
     def _read_file_content(self, path, start_line=None, end_line=None) -> str:
         return self.workspace.read(path, start_line=start_line, end_line=end_line)
 
+    def _capture_original(self, path: str) -> None:
+        """Snapshot pre-edit contents once, before the first write to a path."""
+        relative = self.workspace.relative(self.workspace.resolve(path))
+        if relative in self.original_files:
+            return
+        try:
+            self.original_files[relative] = self.workspace.read(path)
+        except WorkspaceError:
+            # Missing, binary, or oversized: the diff treats it as a new file.
+            self.original_files[relative] = None
+
     def _write_file_patch(self, path, content=None, old_string=None, new_string=None) -> str:
+        self._capture_original(path)
         targeted = old_string is not None or new_string is not None
         if targeted and content is not None:
             raise WorkspaceError(
