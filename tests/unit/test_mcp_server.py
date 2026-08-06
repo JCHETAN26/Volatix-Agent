@@ -152,6 +152,40 @@ async def test_run_test_suite_forwards_the_test_path(server, runner, workspace):
     runner.run_tests.assert_called_once_with(str(workspace.root), "tests/test_calc.py::test_add")
 
 
+def test_backend_captures_the_pre_edit_baseline(workspace):
+    """Phase 6's diff depends on this; without it every patch looks like a new file."""
+    from agent.tools import ToolBackend
+
+    backend = ToolBackend(workspace)
+    original = (workspace.root / "calc.py").read_text()
+
+    backend.dispatch("write_file_patch", {"path": "calc.py", "content": "x = 1\n"})
+
+    assert backend.original_files["calc.py"] == original
+
+
+def test_backend_records_none_for_a_created_file(workspace):
+    from agent.tools import ToolBackend
+
+    backend = ToolBackend(workspace)
+    backend.dispatch("write_file_patch", {"path": "brand_new.py", "content": "x = 1\n"})
+
+    assert backend.original_files["brand_new.py"] is None
+
+
+def test_backend_keeps_the_first_baseline_across_repeated_edits(workspace):
+    """A second edit must not overwrite the baseline with the first edit's result."""
+    from agent.tools import ToolBackend
+
+    backend = ToolBackend(workspace)
+    original = (workspace.root / "calc.py").read_text()
+
+    backend.dispatch("write_file_patch", {"path": "calc.py", "content": "first\n"})
+    backend.dispatch("write_file_patch", {"path": "calc.py", "content": "second\n"})
+
+    assert backend.original_files["calc.py"] == original
+
+
 @pytest.mark.anyio
 async def test_path_traversal_is_refused_through_the_tool_layer(server):
     """Confinement must hold at the MCP boundary, not just in Workspace."""
