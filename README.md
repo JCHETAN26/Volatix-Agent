@@ -22,7 +22,7 @@ Issue ─▶ Planner ─▶ Executor ─▶ Validator ─┬─ pass ─▶ Patc
 | 2 | Ephemeral Docker sandbox | ✅ Done |
 | 3 | MCP server & tool suite | ✅ Done |
 | 4 | LangGraph nodes & state machine | ✅ Done |
-| 5 | Stack-trace trimming & self-correction routing | ⬜ Not started |
+| 5 | Stack-trace trimming & self-correction routing | ✅ Done |
 | 6 | Output artifacts & terminal UI | ⬜ Not started |
 | 7 | Evaluation suite & metrics | ⬜ Not started |
 
@@ -102,6 +102,35 @@ Validator so the Executor cannot mark its own homework.
 
 `temperature`, `top_p`, and `top_k` are never sent — Claude Opus 5 rejects them. Depth is
 controlled with `effort` instead.
+
+### Stack-trace trimming
+
+Raw pytest output is mostly noise to a model trying to fix a bug. `trim_stack_trace`
+keeps the assertion text and the innermost frame in *your* code, and drops session
+banners, progress dots, passing tests, and framework frames from `_pytest`, `importlib`,
+and `site-packages`. Measured on real pytest output:
+
+| Failure kind | Before | After | Reduction |
+|--------------|-------:|------:|----------:|
+| Assertion + exception | 1012 ch | 206 ch | 80% |
+| Collection (SyntaxError) | 1084 ch | 139 ch | 88% |
+
+```
+2 failed, 1 passed in 0.02s
+
+tests/test_calc.py::test_add  (tests/test_calc.py:5)
+  assert -1 == 5
+  +  where -1 = add(2, 3)
+
+tests/test_calc.py::test_boom  (calc.py:6)
+  ZeroDivisionError: division by zero
+```
+
+Note `test_boom` resolves to `calc.py:6` — the innermost frame in the source, not the
+`tests/test_calc.py:9` line where the assertion sits.
+
+Unrecognised output (sandbox error, timeout kill, segfault) falls back to the raw tail
+rather than returning nothing, which would silently break the retry loop.
 
 ## Layout
 

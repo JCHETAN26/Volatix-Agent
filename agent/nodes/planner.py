@@ -55,6 +55,10 @@ cannot happen.
 If the outline shows a SyntaxError, that is almost certainly the defect itself -- plan to
 fix it first.
 
+Plan only code changes. A separate validation stage runs the test suite after your plan
+is applied, and the stage that executes your plan has no test-running tool, so a step
+like "run pytest to confirm" cannot be carried out. End the plan at the last edit.
+
 You cannot see function bodies, so where a step depends on implementation detail, say
 which file and line range the executor should read before editing."""
 
