@@ -14,7 +14,8 @@ authors = [{ name = "Chetan J" }]
 dependencies = [
     "langgraph>=0.2.0",
     "langchain-core>=0.3.0",
-    "mcp>=1.0.0",
+    # 2.x only: the tool API moved from FastMCP to MCPServer, so 1.x will not import.
+    "mcp>=2.0.0",
     "docker>=7.1.0",
     "rich>=13.7.0",
     "pydantic>=2.7.0",
@@ -24,6 +25,8 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",
+    # Supplies the pytest plugin behind @pytest.mark.anyio for the async MCP handlers.
+    "anyio>=4.0.0",
     "black>=24.0.0",
     "flake8>=7.0.0",
 ]

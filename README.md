@@ -20,7 +20,7 @@ Issue ─▶ Planner ─▶ Executor ─▶ Validator ─┬─ pass ─▶ Patc
 |-------|-------|-------|
 | 1 | Repo layout, CI, branch protection | ✅ Done |
 | 2 | Ephemeral Docker sandbox | ✅ Done |
-| 3 | MCP server & tool suite | ⬜ Not started |
+| 3 | MCP server & tool suite | ✅ Done |
 | 4 | LangGraph nodes & state machine | ⬜ Not started |
 | 5 | Stack-trace trimming & self-correction routing | ⬜ Not started |
 | 6 | Output artifacts & terminal UI | ⬜ Not started |
@@ -47,6 +47,33 @@ response to a bug report. Each run gets a fresh container with:
 
 The container runs as the host UID rather than the image's baked-in user, so pytest can
 write `__pycache__` into the mounted workspace without running as root.
+
+### MCP tool suite
+
+Tools are exposed over the Model Context Protocol (`mcp_server/server.py`), served over
+stdio:
+
+| Tool | Purpose |
+|------|---------|
+| `list_workspace_files` | Discover what exists before reaching for anything else |
+| `get_ast_symbols` | Class/function signatures with **bodies stripped** |
+| `read_file_content` | Read a file, or just a line range |
+| `write_file_patch` | Exact-substring edit, or full rewrite |
+| `run_test_suite` | Execute pytest in the Docker sandbox |
+
+**Path confinement.** Every path an agent supplies is untrusted — it comes from an LLM
+reasoning about a bug report. `Workspace.resolve()` canonicalizes each path and rejects
+anything escaping the root: `../` traversal, absolute paths, symlinks pointing outside,
+and NUL bytes.
+
+**AST body-stripping** is the main context-window saving in the pipeline: a long module
+collapses to a signature outline annotated with line ranges, so the agent reads only the
+regions that matter. A file that doesn't parse returns its `SyntaxError` and location as
+data rather than failing — a bug report is frequently *about* a syntax error.
+
+```bash
+VOLATIX_WORKSPACE=/path/to/repo python -m mcp_server.server
+```
 
 ## Layout
 
