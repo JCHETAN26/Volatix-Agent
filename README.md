@@ -21,7 +21,7 @@ Issue ─▶ Planner ─▶ Executor ─▶ Validator ─┬─ pass ─▶ Patc
 | 1 | Repo layout, CI, branch protection | ✅ Done |
 | 2 | Ephemeral Docker sandbox | ✅ Done |
 | 3 | MCP server & tool suite | ✅ Done |
-| 4 | LangGraph nodes & state machine | ⬜ Not started |
+| 4 | LangGraph nodes & state machine | ✅ Done |
 | 5 | Stack-trace trimming & self-correction routing | ⬜ Not started |
 | 6 | Output artifacts & terminal UI | ⬜ Not started |
 | 7 | Evaluation suite & metrics | ⬜ Not started |
@@ -74,6 +74,34 @@ data rather than failing — a bug report is frequently *about* a syntax error.
 ```bash
 VOLATIX_WORKSPACE=/path/to/repo python -m mcp_server.server
 ```
+
+### The graph
+
+```
+planner ─▶ executor ─▶ validator ─┬─ pass ────────▶ finalize ─▶ END
+              ▲                   │
+              └─────── retry ◀────┤   (retry_count++, failure injected)
+                                  │
+                                  └─ budget spent ─▶ give_up ─▶ END
+```
+
+Nodes are built with their dependencies bound, so the graph holds no global state and
+tests drive it with a fake client and a fake sandbox — no API key, no daemon.
+
+| Node | Model config | Notes |
+|------|--------------|-------|
+| Planner | `claude-opus-5`, effort `high`, structured output | Sees the AST outline of the whole repo, never file bodies |
+| Executor | `claude-opus-5`, effort `xhigh`, tool-use loop | Capped at 25 tool iterations |
+| Validator | no model call | Sole owner of the pass/fail verdict |
+
+Retries re-enter the **Executor**, not the Planner — re-planning an unchanged repository
+would just spend tokens to reach the same plan.
+
+The Executor is deliberately not given `run_test_suite`: validation belongs to the
+Validator so the Executor cannot mark its own homework.
+
+`temperature`, `top_p`, and `top_k` are never sent — Claude Opus 5 rejects them. Depth is
+controlled with `effort` instead.
 
 ## Layout
 
