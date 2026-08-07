@@ -1,0 +1,7 @@
+{
+  "id": "edge_003",
+  "category": "edge",
+  "issue": "chunk(items, size) loses the final partial chunk: chunk([1,2,3,4,5], 2) omits [5].",
+  "test_path": "tests/",
+  "buggy_file": "chunker.py"
+}

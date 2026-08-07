@@ -15,6 +15,7 @@ from tests.unit.conftest import (
     FakeClaudeClient,
     message,
     plan_message,
+    prompt_text,
     text_block,
     tool_block,
 )
@@ -175,7 +176,7 @@ def test_executor_injects_the_failure_on_a_retry(state, workspace):
 
     executor_node(state, client=client, backend=ToolBackend(workspace))
 
-    prompt = client.requests[0]["messages"][0]["content"]
+    prompt = prompt_text(client.requests[0])
     assert "did not pass the test suite" in prompt
     assert "assert -1 == 5" in prompt
 
@@ -191,7 +192,7 @@ def test_executor_first_pass_has_no_retry_preamble(state, workspace):
 
     executor_node(state, client=client, backend=ToolBackend(workspace))
 
-    assert "did not pass" not in client.requests[0]["messages"][0]["content"]
+    assert "did not pass" not in prompt_text(client.requests[0])
 
 
 def test_executor_is_not_given_the_test_runner(state, workspace):

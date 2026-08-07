@@ -1,0 +1,7 @@
+{
+  "id": "edge_002",
+  "category": "edge",
+  "issue": "rate(0, 10) raises ZeroDivisionError instead of returning 0.0 for an empty denominator.",
+  "test_path": "tests/",
+  "buggy_file": "ratio.py"
+}

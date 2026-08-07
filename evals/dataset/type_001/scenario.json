@@ -1,0 +1,7 @@
+{
+  "id": "type_001",
+  "category": "type",
+  "issue": "build_label raises TypeError: can only concatenate str (not \"int\") to str when given a numeric count.",
+  "test_path": "tests/",
+  "buggy_file": "labels.py"
+}

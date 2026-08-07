@@ -13,7 +13,14 @@ the benchmark should not depend on a beta surface.
 
 from typing import Any, Dict, List
 
-from agent.llm import EXECUTOR_EFFORT, ClaudeClient, LLMError, text_of, tool_uses
+from agent.llm import (
+    EXECUTOR_EFFORT,
+    ClaudeClient,
+    LLMError,
+    cacheable_text,
+    text_of,
+    tool_uses,
+)
 from agent.state import AgentState
 from agent.tools import TOOL_DEFINITIONS, ToolBackend
 
@@ -67,7 +74,12 @@ def executor_node(
     backend: ToolBackend,
 ) -> dict:
     """Apply the plan via tool calls, returning the files that were modified."""
-    messages: List[Dict[str, Any]] = [{"role": "user", "content": _initial_prompt(state)}]
+    # The opening turn is stable for the whole loop, so it carries a cache breakpoint;
+    # combined with the one on the system block, the entire fixed prefix stays warm
+    # across every tool iteration instead of being re-sent at full price.
+    messages: List[Dict[str, Any]] = [
+        {"role": "user", "content": cacheable_text(_initial_prompt(state))}
+    ]
     summary = ""
 
     for _ in range(MAX_TOOL_ITERATIONS):

@@ -10,6 +10,8 @@ from agent.llm import (
     ClaudeClient,
     LLMError,
     TokenUsage,
+    cacheable_text,
+    system_blocks,
     text_of,
     tool_uses,
 )
@@ -106,9 +108,61 @@ def test_token_usage_as_dict():
         "input_tokens": 10,
         "output_tokens": 5,
         "cache_read_tokens": 3,
+        "cache_creation_tokens": 0,
         "calls": 1,
-        "total_tokens": 15,
+        "total_tokens": 18,
+        "billable_input_tokens": 10.3,
     }
+
+
+def test_total_counts_cached_prompt_tokens():
+    """input_tokens is only the uncached remainder, so a naive sum under-reports."""
+    usage = TokenUsage()
+    usage.add(FakeUsage(input_tokens=10, output_tokens=5, cache_read_input_tokens=1000))
+    assert usage.total == 1015
+
+
+def test_billable_input_discounts_cache_reads():
+    """A cache-heavy run costs far less than its raw token count suggests."""
+    cached = TokenUsage()
+    cached.add(FakeUsage(input_tokens=0, output_tokens=0, cache_read_input_tokens=1000))
+    uncached = TokenUsage()
+    uncached.add(FakeUsage(input_tokens=1000, output_tokens=0))
+
+    assert cached.total == uncached.total == 1000
+    assert cached.billable_input == 100.0
+    assert uncached.billable_input == 1000.0
+
+
+# --- prompt caching ---------------------------------------------------------------
+
+
+def test_system_prompt_carries_a_cache_breakpoint():
+    """Requests render tools -> system -> messages, so this caches both."""
+    inner = sdk_client(message([text_block("hi")]))
+    ClaudeClient(client=inner).complete(system="stable prompt", messages=[])
+
+    system = inner.messages.create.call_args.kwargs["system"]
+    assert system[0]["text"] == "stable prompt"
+    assert system[0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_caching_can_be_disabled():
+    inner = sdk_client(message([text_block("hi")]))
+    ClaudeClient(client=inner).complete(system="s", messages=[], cache_prompt=False)
+
+    assert "cache_control" not in inner.messages.create.call_args.kwargs["system"][0]
+
+
+def test_system_blocks_helper():
+    assert system_blocks("x", cache=False) == [{"type": "text", "text": "x"}]
+    assert system_blocks("x")[0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_cacheable_text_marks_a_breakpoint():
+    blocks = cacheable_text("plan goes here")
+    assert blocks[0]["text"] == "plan goes here"
+    assert blocks[0]["cache_control"] == {"type": "ephemeral"}
 
 
 def test_token_usage_tolerates_missing_fields():

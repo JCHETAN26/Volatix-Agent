@@ -8,4 +8,6 @@ exclude =
     .venv,
     build,
     dist,
-    *.egg-info
+    *.egg-info,
+    # Benchmark fixtures are deliberately broken; two do not parse at all.
+    evals/dataset

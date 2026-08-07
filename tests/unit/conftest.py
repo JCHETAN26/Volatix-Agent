@@ -79,6 +79,14 @@ class FakeClaudeClient:
         return not self._responses
 
 
+def prompt_text(request: Dict[str, Any]) -> str:
+    """Text of a recorded request's first user turn, which may be blocks or a string."""
+    content = request["messages"][0]["content"]
+    if isinstance(content, str):
+        return content
+    return "".join(block["text"] for block in content if block.get("type") == "text")
+
+
 @pytest.fixture
 def repo(tmp_path):
     """A tiny broken repository: add() subtracts, and a test asserts it adds."""

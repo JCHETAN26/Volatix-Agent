@@ -24,7 +24,7 @@ Issue ─▶ Planner ─▶ Executor ─▶ Validator ─┬─ pass ─▶ Patc
 | 4 | LangGraph nodes & state machine | ✅ Done |
 | 5 | Stack-trace trimming & self-correction routing | ✅ Done |
 | 6 | Output artifacts & terminal UI | ✅ Done |
-| 7 | Evaluation suite & metrics | ⬜ Not started |
+| 7 | Evaluation suite & metrics | ✅ Done |
 
 Phases 1–2 ship the package skeleton, the `AgentState` schema, the router decision
 function, the Docker sandbox runner, and a green CI pipeline. Every other module is a
@@ -162,6 +162,45 @@ An incomplete patch that says so beats a wrong one that doesn't.
 ```
 
 Exit codes: `0` tests pass, `1` tests fail or the run aborted, `2` bad configuration.
+
+### Benchmark
+
+Ten synthetic scenarios across the plan's four bug categories, each with a test that
+fails on the bug and a reference fix. **Both properties are asserted by the test suite**,
+by actually running pytest — a scenario that passes while still broken would silently
+inflate Pass@1, and one that fails even when fixed makes the agent look worse than it is.
+
+| Condition | What it is |
+|-----------|------------|
+| **A — baseline** | One prompt, full file contents, no AST trimming, no tools, no retry |
+| **B — agent** | The full self-healing graph with AST trimming and the sandbox |
+
+Metrics: Pass@1, convergence speed (retries averaged over *successes* only — a failure
+always sits at the ceiling and would skew the mean), token efficiency, and sandbox
+latency per container run.
+
+```bash
+python -m evals.run_evals --output-file evals/results.json
+python -m evals.run_evals --condition agent --category logic
+```
+
+Running the suite needs Docker and an API key, so it is also wired as a manually
+triggered GitHub Actions workflow (`.github/workflows/benchmark.yml`) that posts the
+comparison table to the run summary. It requires an `ANTHROPIC_API_KEY` repository
+secret.
+
+### Prompt caching
+
+A cache breakpoint sits on the system block — requests render tools → system → messages,
+so one breakpoint covers the tool schemas *and* the system prompt — plus one on the
+Executor's opening turn, which is fixed for the whole loop. Measured on a live run:
+
+| | Before | After |
+|---|---:|---:|
+| `cache_read_tokens` | 0 | 3,454 |
+| Billable input tokens | 6,234 | 4,021 |
+
+The saving grows with tool-iteration count, since the cache write is paid once.
 
 ## Layout
 

@@ -33,11 +33,17 @@ class LLMError(RuntimeError):
 
 @dataclass
 class TokenUsage:
-    """Running token totals, for the Phase 7 token-efficiency metric."""
+    """Running token totals, for the Phase 7 token-efficiency metric.
+
+    ``input_tokens`` counts only the *uncached* remainder, so the true prompt size is
+    ``input + cache_creation + cache_read``. Reporting the three separately is what makes
+    the effect of prompt caching visible in the benchmark.
+    """
 
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
     calls: int = 0
 
     def add(self, usage: Any) -> None:
@@ -45,18 +51,36 @@ class TokenUsage:
         self.input_tokens += getattr(usage, "input_tokens", 0) or 0
         self.output_tokens += getattr(usage, "output_tokens", 0) or 0
         self.cache_read_tokens += getattr(usage, "cache_read_input_tokens", 0) or 0
+        self.cache_creation_tokens += getattr(usage, "cache_creation_input_tokens", 0) or 0
 
     @property
     def total(self) -> int:
-        return self.input_tokens + self.output_tokens
+        """Every prompt token processed, cached or not, plus output."""
+        return (
+            self.input_tokens
+            + self.cache_read_tokens
+            + self.cache_creation_tokens
+            + self.output_tokens
+        )
 
-    def as_dict(self) -> Dict[str, int]:
+    @property
+    def billable_input(self) -> float:
+        """Input tokens weighted by what each kind actually costs.
+
+        Cache reads bill at ~0.1x and 5-minute writes at ~1.25x, so a raw token count
+        overstates the cost of a cache-heavy run.
+        """
+        return self.input_tokens + self.cache_creation_tokens * 1.25 + self.cache_read_tokens * 0.1
+
+    def as_dict(self) -> Dict[str, float]:
         return {
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
             "cache_read_tokens": self.cache_read_tokens,
+            "cache_creation_tokens": self.cache_creation_tokens,
             "calls": self.calls,
             "total_tokens": self.total,
+            "billable_input_tokens": round(self.billable_input, 1),
         }
 
 
@@ -82,8 +106,14 @@ class ClaudeClient:
         effort: str = "high",
         tools: Optional[List[Dict[str, Any]]] = None,
         output_schema: Optional[Dict[str, Any]] = None,
+        cache_prompt: bool = True,
     ) -> Any:
         """Send one request and return the raw Message.
+
+        With ``cache_prompt``, a breakpoint is placed on the last system block. Requests
+        render as tools -> system -> messages, so that one breakpoint caches the tool
+        schemas *and* the system prompt together -- the whole stable prefix that the
+        Executor would otherwise re-send on every tool iteration.
 
         Raises:
             LLMError: The model refused the request.
@@ -91,7 +121,7 @@ class ClaudeClient:
         request: Dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "system": system,
+            "system": system_blocks(system, cache=cache_prompt),
             "messages": messages,
             "thinking": {"type": "adaptive"},
             "output_config": {"effort": effort},
@@ -112,6 +142,23 @@ class ClaudeClient:
             category = getattr(detail, "category", None) if detail else None
             raise LLMError(f"Model declined the request (category={category}).")
         return response
+
+
+def system_blocks(system: str, cache: bool = True) -> List[Dict[str, Any]]:
+    """Render the system prompt as blocks, optionally marking a cache breakpoint."""
+    block: Dict[str, Any] = {"type": "text", "text": system}
+    if cache:
+        block["cache_control"] = {"type": "ephemeral"}
+    return [block]
+
+
+def cacheable_text(text: str) -> List[Dict[str, Any]]:
+    """A user-message content block carrying a cache breakpoint.
+
+    Used for the Executor's opening turn: the plan and issue never change across tool
+    iterations, so caching them keeps the whole growing conversation's prefix warm.
+    """
+    return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
 
 
 def text_of(response: Any) -> str:
