@@ -1,0 +1,7 @@
+{
+  "id": "vague_002",
+  "category": "vague",
+  "issue": "The dashboard sometimes shows an error where a number should be. Support says it seems to happen for brand new accounts that have not done anything yet.",
+  "test_path": "tests/",
+  "buggy_file": "reporting.py"
+}

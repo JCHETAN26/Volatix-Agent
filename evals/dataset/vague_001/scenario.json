@@ -1,0 +1,7 @@
+{
+  "id": "vague_001",
+  "category": "vague",
+  "issue": "Customers are telling us the totals on their invoices look too low. Nothing about the pricing has changed recently, so something in the code must be off.",
+  "test_path": "tests/",
+  "buggy_file": "invoicing.py"
+}

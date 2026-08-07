@@ -1,0 +1,7 @@
+{
+  "id": "multi_002",
+  "category": "multifile",
+  "issue": "Text cleanup is broken in two places: normalising a string no longer lowercases it, and de-duplicating a list scrambles the original ordering.",
+  "test_path": "tests/",
+  "buggy_file": "dedupe.py"
+}

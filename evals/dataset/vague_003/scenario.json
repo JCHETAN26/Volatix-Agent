@@ -1,0 +1,7 @@
+{
+  "id": "vague_003",
+  "category": "vague",
+  "issue": "Ordering in the admin list looks wrong to people. Entries do not come back in the order anyone expects when you scan down the page.",
+  "test_path": "tests/",
+  "buggy_file": "listing.py"
+}
