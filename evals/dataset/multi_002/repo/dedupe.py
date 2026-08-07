@@ -1,2 +1,2 @@
 def unique(items):
-    return list(set(items))
+    return sorted(set(items))

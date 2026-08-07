@@ -8,6 +8,7 @@ checked here by actually running pytest, not by inspection.
 These run the dataset's own fixture code, never model output.
 """
 
+import os
 import subprocess
 import sys
 
@@ -28,14 +29,25 @@ DISCRIMINATING_CATEGORIES = {"multifile", "vague"}
 EXPECTED_CATEGORIES = BUG_CATEGORIES | DISCRIMINATING_CATEGORIES
 
 
-def run_pytest(repo) -> subprocess.CompletedProcess:
+def run_pytest(repo, hash_seed: str = "0") -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, "-m", "pytest", "tests/", "-q", "--no-header"],
         cwd=repo,
         capture_output=True,
         text=True,
         timeout=120,
+        env={**os.environ, "PYTHONHASHSEED": hash_seed},
     )
+
+
+def failing_tests(result: subprocess.CompletedProcess) -> set:
+    """Node ids from pytest's short summary, e.g. `tests/test_x.py::test_y`."""
+    found = set()
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line.startswith(("FAILED ", "ERROR ")):
+            found.add(line.split()[1])
+    return found
 
 
 # --- dataset shape ----------------------------------------------------------------
@@ -100,6 +112,29 @@ def test_scenario_fails_before_the_fix(scenario, tmp_path):
     repo = scenario.materialise(str(tmp_path / scenario.id))
     result = run_pytest(repo)
     assert result.returncode != 0, f"{scenario.id} passes while still broken:\n{result.stdout}"
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.id)
+def test_scenario_fails_the_same_tests_under_every_hash_seed(scenario, tmp_path):
+    """The *set of failing tests* must be identical across hash seeds.
+
+    Asserting only that the suite fails is too coarse: in a multi-file scenario one
+    test can flip between pass and fail while another keeps the suite red, hiding the
+    nondeterminism. Found the hard way -- a `list(set(...))` bug produced the expected
+    ordering under roughly one seed in six, so the benchmark credited a fix that never
+    happened while the suite-level check stayed green.
+    """
+    observed = {}
+    for seed in ("0", "7", "11"):
+        repo = scenario.materialise(str(tmp_path / f"{scenario.id}-{seed}"))
+        observed[seed] = failing_tests(run_pytest(repo, hash_seed=seed))
+
+    distinct = {frozenset(v) for v in observed.values()}
+    assert len(distinct) == 1, (
+        f"{scenario.id} fails different tests depending on PYTHONHASHSEED, so a run "
+        f"can pass by luck: {observed}"
+    )
+    assert observed["0"], f"{scenario.id} fails no tests at all"
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.id)
