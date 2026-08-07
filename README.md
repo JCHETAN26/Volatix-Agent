@@ -165,10 +165,17 @@ Exit codes: `0` tests pass, `1` tests fail or the run aborted, `2` bad configura
 
 ### Benchmark
 
-Ten synthetic scenarios across the plan's four bug categories, each with a test that
-fails on the bug and a reference fix. **Both properties are asserted by the test suite**,
-by actually running pytest — a scenario that passes while still broken would silently
-inflate Pass@1, and one that fails even when fixed makes the agent look worse than it is.
+Fifteen synthetic scenarios, each with a test that fails on the bug and a reference fix.
+**Both properties are asserted by the test suite**, by actually running pytest — a
+scenario that passes while still broken would silently inflate Pass@1, and one that fails
+even when fixed makes the agent look worse than it is.
+
+The first sweep scored **100% under both conditions**, which proved the pipeline works
+end to end but said nothing about whether the agent loop beats a single prompt. Two
+categories were added to make the comparison discriminating: `multifile` (two failures in
+two files — the baseline emits one `{path, content}`, so it cannot pass by construction)
+and `vague` (symptom-only reports in repos with distractor modules). See
+`evals/dataset/README.md`.
 
 | Condition | What it is |
 |-----------|------------|

@@ -1,0 +1,7 @@
+{
+  "id": "multi_001",
+  "category": "multifile",
+  "issue": "Two separate finance helpers are returning wrong numbers. Conversion comes back far too small, and the fee helper is reducing the amount instead of adding to it.",
+  "test_path": "tests/",
+  "buggy_file": "fees.py"
+}
